@@ -3,10 +3,9 @@ import pandas as pd
 from datetime import datetime, date
 from streamlit_gsheets import GSheetsConnection
 
-# 1. Config
 st.set_page_config(page_title="Fatima Intelligence Systems", layout="wide", page_icon="🛡️")
 
-# --- 2. GATEKEEPER ---
+# --- SECURITY ---
 valid_keys = st.secrets.get("valid_keys", [])
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
@@ -18,28 +17,24 @@ with st.sidebar:
         st.session_state['authenticated'] = True
 
 if not st.session_state['authenticated']:
-    st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🛡️ FATIMA INTELLIGENCE SYSTEMS</h1>", unsafe_allow_html=True)
-    st.info("Terminal Locked. Enter License Key to access your digital empire.")
+    st.markdown("<h1 style='text-align: center;'>🛡️ FATIMA INTELLIGENCE SYSTEMS</h1>", unsafe_allow_html=True)
     st.stop()
 
-# --- 3. CLOUD ENGINE ---
+# --- CLOUD ENGINE (THE FINAL FIX) ---
+# OMEGA: We use the ID from secrets directly
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_data():
     try:
-        # We try to read the sheet. If it fails, we return an empty template
-        data = conn.read(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], 
-                         worksheet="SubMaster_DB", 
-                         ttl=0)
-        return data
+        # Standard reading - it will use the spreadsheet from secrets automatically
+        return conn.read(ttl=0) 
     except Exception as e:
         return pd.DataFrame(columns=['Name', 'Service', 'Phone', 'Expiry', 'Status', 'Price'])
 
 df = load_data()
 
-# --- 4. INTERFACE ---
 st.title("📱 Sub-Master Pro")
-t1, t2 = st.tabs(["📋 Live Alerts", "➕ Add Client"])
+t1, t2 = st.tabs(["📋 Database", "➕ Add Client"])
 
 with t2:
     with st.form("sub_form", clear_on_submit=True):
@@ -55,18 +50,14 @@ with t2:
             if name and phone:
                 new_row = pd.DataFrame([{"Name": name, "Service": srv, "Phone": str(phone), "Expiry": str(exp), "Status": "Actif", "Price": prc}])
                 updated_df = pd.concat([df, new_row], ignore_index=True)
-                conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], 
-                            worksheet="SubMaster_DB", 
-                            data=updated_df)
+                # OMEGA FORCE: Update the first worksheet
+                conn.update(data=updated_df)
                 st.balloons()
-                st.success(f"✅ {name} secured in Cloud!")
                 st.cache_data.clear()
                 st.rerun()
 
 with t1:
     if not df.empty:
         st.dataframe(df, use_container_width=True)
-        st.metric("Total Revenue", f"{df['Price'].sum()} DH")
     else:
-        st.warning("⚠️ Cloud is currently empty or not syncing correctly.")
-        st.info("Try to add your first client in the 'Add Client' tab.")
+        st.info("Cloud is currently empty. Add your first client.")

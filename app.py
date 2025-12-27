@@ -1,100 +1,80 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
-# 1. Global Config
-st.set_page_config(page_title="Fatima Intelligence Systems", layout="wide")
+# 1. Config
+st.set_page_config(page_title="Fatima Intelligence: Sub-Master Pro", layout="wide")
 
-# --- 2. THE GATEKEEPER (SECURITY) ---
+# --- 2. SECURITY ---
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 
-st.sidebar.header("🔐 Secure Access")
-user_key = st.sidebar.text_input("License Key", type="password")
+# Role management: Admin aw Client
+role = st.sidebar.selectbox("Login As", ["Admin", "Client Portal"])
+access_key = st.sidebar.text_input("Access Key / Phone Number", type="password")
 
-if user_key not in st.secrets.get("valid_keys", []):
-    st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🛡️ FATIMA INTELLIGENCE SYSTEMS</h1>", unsafe_allow_html=True)
-    st.markdown("---")
-    st.error("🔒 **RESTRICTED ACCESS AREA**")
-    st.info("Please enter your License Key to access the suite.")
-    st.stop()
+# --- 3. DATA PERSISTENCE (Simulation for now - Sync with GSheets tomorrow) ---
+if 'master_db' not in st.session_state:
+    st.session_state['master_db'] = pd.DataFrame([
+        {'Name': 'Said', 'Service': 'Netflix', 'Phone': '0661XXX', 'Expiry': date(2025, 12, 30), 'Status': 'Actif', 'Price': 50},
+        {'Name': 'Hamza', 'Service': 'ChatGPT Pro', 'Phone': '0662XXX', 'Expiry': date(2025, 12, 28), 'Status': 'Actif', 'Price': 200}
+    ])
 
-# --- 3. NAVIGATION ---
-st.sidebar.markdown("---")
-st.sidebar.header("🚀 Select Tool")
-tool = st.sidebar.selectbox("Choose Service", ["Profit-Flow (Excel Analytics)", "Sub-Master (Digital CRM)"])
+df = st.session_state['master_db']
 
-# --- 4. TOOL 1: PROFIT-FLOW (The Analytics Legend) ---
-if tool == "Profit-Flow (Excel Analytics)":
-    st.title("📊 Profit-Flow: Business Analytics")
-    uploaded_file = st.file_uploader("Upload Excel/CSV", type=['csv', 'xlsx'])
+# --- 4. ADMIN INTERFACE ---
+if role == "Admin":
+    if access_key not in st.secrets.get("valid_keys", []):
+        st.error("🔒 Admin Access Denied.")
+        st.stop()
+
+    st.title("👨‍💻 Admin Control Center")
     
-    if uploaded_file:
-        header_row = st.sidebar.number_input("Header Row Index", value=3)
-        try:
-            df = pd.read_excel(uploaded_file, header=header_row, engine='openpyxl') if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-            
-            # Universal cleaning
-            df = df.loc[:, [col for col in df.columns if not str(col).startswith('Unnamed')]].dropna(how='all')
-            
-            st.sidebar.header("🛠️ Mapping")
-            all_cols = df.columns.tolist()
-            status_col = st.sidebar.selectbox("Status Column", all_cols)
-            price_col = st.sidebar.selectbox("Price Column", all_cols)
-            client_col = st.sidebar.selectbox("Client Column", all_cols)
-            
-            # Fix: Force numeric conversion
-            df[price_col] = pd.to_numeric(df[price_col], errors='coerce').fillna(0)
-            
-            # --- THE OMEGA FIX: Handle non-string values safely ---
-            success_mask = df[status_col].astype(str).str.contains('Actif|Payé|✅|Livre|Success', na=False, case=False)
-            delivered_count = len(df[success_mask])
-            total_count = len(df)
-            
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Total Volume", f"{df[price_col].sum():,.2f} DH")
-            success_rate = (delivered_count / total_count * 100) if total_count > 0 else 0
-            c2.metric("Success Rate", f"{success_rate:.1f}%")
-            c3.metric("Records", total_count)
-            
-            st.plotly_chart(px.pie(df, names=status_col, hole=0.4), use_container_width=True)
-            st.dataframe(df)
-        except Exception as e:
-            st.error(f"Error processing file: {e}")
-
-# --- 5. TOOL 2: SUB-MASTER (The Subscription Manager) ---
-else:
-    st.title("📱 Sub-Master: Subscription Manager")
-    if 'clients_db' not in st.session_state:
-        st.session_state['clients_db'] = pd.DataFrame(columns=['Name', 'Service', 'End Date', 'Status', 'Price'])
-
-    tab1, tab2 = st.tabs(["📋 View Clients", "➕ Add Subscription"])
+    # --- TAB 1: SMART ALERTS ---
+    t1, t2, t3 = st.tabs(["⚠️ Urgent Alerts", "➕ New Subscription", "📋 Full Management"])
     
-    with tab2:
-        with st.form("sub_form"):
-            c1, c2 = st.columns(2)
-            name = c1.text_input("Client Name")
-            srv = c2.selectbox("Service", ["Netflix", "IPTV", "Canva", "Disney+", "Spotify"])
-            e_date = c1.date_input("Expiry Date", value=date.today())
-            prc = c2.number_input("Price (DH)", value=50)
-            sts = st.selectbox("Status", ["Actif", "En attente", "Payé"])
-            if st.form_submit_button("Save Client"):
-                new_row = pd.DataFrame([[name, srv, e_date, sts, prc]], columns=st.session_state['clients_db'].columns)
-                st.session_state['clients_db'] = pd.concat([st.session_state['clients_db'], new_row], ignore_index=True)
-                st.success(f"Client {name} Added!")
-
-    with tab1:
-        db = st.session_state['clients_db']
-        if not db.empty:
-            # Fix: Proper date conversion for calculation
-            db['Days Left'] = (pd.to_datetime(db['End Date']) - pd.Timestamp(date.today())).dt.days
-            
-            def style_days(val):
-                color = 'red' if val <= 2 else 'orange' if val <= 5 else 'green'
-                return f'background-color: {color}; color: white; font-weight: bold'
-            
-            st.dataframe(db.style.applymap(style_days, subset=['Days Left']))
-            st.markdown(f"**Total Projected Revenue:** {db['Price'].sum()} DH")
+    with t1:
+        st.subheader("Clients Expiring Soon")
+        df['Days_Left'] = (pd.to_datetime(df['Expiry']).dt.date - date.today()).apply(lambda x: x.days)
+        urgent = df[df['Days_Left'] <= 3]
+        if not urgent.empty:
+            st.warning(f"Found {len(urgent)} clients near expiry!")
+            for i, row in urgent.iterrows():
+                col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+                col1.write(f"**{row['Name']}** ({row['Service']})")
+                col2.write(f"Remaining: {row['Days_Left']} days")
+                if col3.button(f"Renew {row['Name']}", key=f"ren_{i}"):
+                    # Logic: Add 30 days to expiry
+                    st.session_state['master_db'].at[i, 'Expiry'] = date.today() + timedelta(days=30)
+                    st.success("Renewed!")
         else:
-            st.info("No subscriptions found yet.")
+            st.success("All systems clear. No urgent expiries.")
+
+    with t2:
+        with st.form("add_sub"):
+            st.subheader("Add Digital Service")
+            c1, c2, c3 = st.columns(3)
+            name = c1.text_input("Client Name")
+            phone = c2.text_input("Phone Number")
+            srv = c3.selectbox("Service", ["Netflix", "ChatGPT Pro", "Perplexity Pro", "Gemini Pro", "Canva", "IPTV"])
+            exp = st.date_input("Expiry Date")
+            prc = st.number_input("Price (DH)", value=50)
+            if st.form_submit_button("Register & Sync"):
+                new_row = {'Name': name, 'Service': srv, 'Phone': phone, 'Expiry': exp, 'Status': 'Actif', 'Price': prc}
+                st.session_state['master_db'] = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                st.success("Synced to Cloud!")
+
+# --- 5. CLIENT PORTAL (The Self-Service) ---
+elif role == "Client Portal":
+    st.title("👤 My Subscription Portal")
+    if access_key != "":
+        client_data = df[df['Phone'] == access_key]
+        if not client_data.empty:
+            for i, row in client_data.iterrows():
+                st.write(f"### Welcome {row['Name']}")
+                st.info(f"Service: {row['Service']} | Expiry: {row['Expiry']}")
+                if st.button("Cancel Subscription", key=f"can_{i}"):
+                    st.session_state['master_db'].at[i, 'Status'] = 'Annulé'
+                    st.warning("Request sent to Admin.")
+        else:
+            st.error("Phone number not found.")

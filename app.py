@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="OMEGA: Universal Analytics", layout="wide")
+st.set_page_config(page_title="Universal Analytics", layout="wide")
 
-st.title("🛡️ OMEGA: Universal Business Intelligence")
+st.title("🛡️: Universal Business Intelligence")
 st.write("If the data looks wrong, adjust the **Header Row** in the sidebar.")
 
 uploaded_file = st.file_uploader("Upload Data", type=['csv', 'xlsx'])
@@ -86,4 +86,5 @@ if uploaded_file is not None:
             st.warning("The selected row doesn't look like a header. Try another row number.")
 
     except Exception as e:
-        st.error(f"❌ OMEGA Error: {e}")
+
+        st.error(f"❌ Error: {e}")

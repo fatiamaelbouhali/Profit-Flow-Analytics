@@ -3,6 +3,26 @@ import pandas as pd
 import plotly.express as px
 
 st.set_page_config(page_title="Universal Analytics", layout="wide")
+# --- OMEGA GATEKEEPER: THE ARMOR ---
+if 'authenticated' not in st.session_state:
+    st.session_state['authenticated'] = False
+
+st.sidebar.header("🔐 Access Control")
+user_key = st.sidebar.text_input("Enter License Key", type="password")
+
+# We look for the keys in Streamlit's Secret Vault
+valid_keys = st.secrets.get("valid_keys", [])
+
+if user_key in valid_keys:
+    st.session_state['authenticated'] = True
+    st.sidebar.success("✅ Access Granted")
+else:
+    if user_key != "":
+        st.sidebar.error("❌ Invalid Key")
+    
+    st.warning("🛡️ This system is protected by OMEGA. Enter a valid license key.")
+    st.info("No license? Contact fatima@example.com")
+    st.stop()
 
 st.title("🛡️: Universal Business Intelligence")
 st.write("If the data looks wrong, adjust the **Header Row** in the sidebar.")
@@ -88,3 +108,4 @@ if uploaded_file is not None:
     except Exception as e:
 
         st.error(f"❌ Error: {e}")
+
